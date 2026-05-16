@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lønnsammenligner</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      text-align: center;
+      padding: 28px 20px 20px;
+    }
+
+    header h1 {
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    header p {
+      margin-top: 6px;
+      color: #a0a8c0;
+      font-size: 0.95rem;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 36px auto;
+      padding: 0 20px;
+    }
+
+    /* ── Person cards ── */
+    .persons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .photo-wrap {
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+      background: #e8eaf0;
+      aspect-ratio: 4 / 3;
+    }
+
+    .photo-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+      transition: transform 0.25s ease, filter 0.25s ease;
+    }
+
+    .photo-wrap:hover img {
+      transform: scale(1.04);
+      filter: brightness(0.88);
+    }
+
+    .photo-wrap .click-hint {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-size: 0.78rem;
+      padding: 4px 12px;
+      border-radius: 20px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .photo-wrap:hover .click-hint {
+      opacity: 1;
+    }
+
+    .card-body {
+      padding: 20px 22px 24px;
+    }
+
+    .card-body h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .stat {
+      background: #f5f6fa;
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+
+    .stat .label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #7a7f9a;
+      margin-bottom: 4px;
+    }
+
+    .stat .value {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #1a1a2e;
+    }
+
+    .stat.wide {
+      grid-column: span 2;
+    }
+
+    .no-data {
+      color: #b0b4c8;
+      font-style: italic;
+      font-size: 0.9rem;
+    }
+
+    /* ── Comparison ── */
+    .comparison {
+      margin-top: 28px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 28px 32px;
+    }
+
+    .comparison h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #1a1a2e;
+    }
+
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .cmp-stat {
+      background: #f5f6fa;
+      border-radius: 10px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+
+    .cmp-stat .label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #7a7f9a;
+      margin-bottom: 6px;
+    }
+
+    .cmp-stat .value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+
+    .comment-box {
+      background: #1a1a2e;
+      color: #fff;
+      border-radius: 12px;
+      padding: 16px 20px;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 18px;
+      padding: 32px 36px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+    }
+
+    .modal h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .modal .subtitle {
+      color: #7a7f9a;
+      font-size: 0.88rem;
+      margin-bottom: 22px;
+    }
+
+    .modal label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #44475a;
+      margin-bottom: 6px;
+    }
+
+    .modal input[type="number"] {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid #d0d3e0;
+      border-radius: 10px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 18px;
+    }
+
+    .modal input[type="number"]:focus {
+      border-color: #1a1a2e;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .radio-group label {
+      flex: 1;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .radio-group input[type="radio"] {
+      display: none;
+    }
+
+    .radio-group .radio-btn {
+      display: block;
+      text-align: center;
+      padding: 9px 6px;
+      border: 1.5px solid #d0d3e0;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #7a7f9a;
+      transition: all 0.18s;
+    }
+
+    .radio-group input[type="radio"]:checked + .radio-btn {
+      border-color: #1a1a2e;
+      background: #1a1a2e;
+      color: #fff;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.18s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+
+    .btn-primary {
+      background: #1a1a2e;
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: #f0f2f5;
+      color: #44475a;
+    }
+
+    @media (max-width: 600px) {
+      .persons { grid-template-columns: 1fr; }
+      .comparison-grid { grid-template-columns: 1fr; }
+      .modal { padding: 24px 20px; margin: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Lønnsammenligner</h1>
+  <p>Klikk på et bilde for å registrere lønn</p>
+</header>
+
+<main>
+  <div class="persons">
+    <div class="card" id="card-herman">
+      <div class="photo-wrap" onclick="openModal('herman')">
+        <img src="Herman.png" alt="Herman">
+        <span class="click-hint">Registrer lønn</span>
+      </div>
+      <div class="card-body">
+        <h2>Herman</h2>
+        <div class="stats-grid" id="stats-herman"></div>
+      </div>
+    </div>
+
+    <div class="card" id="card-ditlev">
+      <div class="photo-wrap" onclick="openModal('ditlev')">
+        <img src="Ditlev.webp" alt="Ditlev">
+        <span class="click-hint">Registrer lønn</span>
+      </div>
+      <div class="card-body">
+        <h2>Ditlev</h2>
+        <div class="stats-grid" id="stats-ditlev"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="comparison">
+    <h2>Sammenligning</h2>
+    <div class="comparison-grid" id="comparison-grid"></div>
+    <div class="comment-box" id="comment-box">Ingen data ennå — registrer lønn for begge for å se sammenligning.</div>
+  </div>
+</main>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h3 id="modal-title">Registrer lønn</h3>
+    <p class="subtitle">Velg type og skriv inn beløpet</p>
+
+    <label for="salary-input">Beløp (kr)</label>
+    <input type="number" id="salary-input" min="0" step="1" placeholder="f.eks. 65000">
+
+    <label style="margin-bottom:10px">Lønnstype</label>
+    <div class="radio-group">
+      <label>
+        <input type="radio" name="salary-type" value="hourly">
+        <span class="radio-btn">Timelønn</span>
+      </label>
+      <label>
+        <input type="radio" name="salary-type" value="monthly" checked>
+        <span class="radio-btn">Månedslønn</span>
+      </label>
+      <label>
+        <input type="radio" name="salary-type" value="yearly">
+        <span class="radio-btn">Årslønn</span>
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Avbryt</button>
+      <button class="btn btn-primary" onclick="saveSalary()">Lagre</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const HOURLY_HOURS = 1950; // 37.5t/uke × 52 uker
+
+  let currentPerson = null;
+
+  // ── Data helpers ──────────────────────────────────────────
+
+  function loadData() {
+    const raw = localStorage.getItem('lonn-sammenligner');
+    if (!raw) return { herman: [], ditlev: [] };
+    return JSON.parse(raw);
+  }
+
+  function saveData(data) {
+    localStorage.setItem('lonn-sammenligner', JSON.stringify(data));
+  }
+
+  function toYearly(amount, type) {
+    if (type === 'hourly')  return amount * HOURLY_HOURS;
+    if (type === 'monthly') return amount * 12;
+    return amount;
+  }
+
+  function latestYearly(entries) {
+    if (!entries || entries.length === 0) return null;
+    return entries[entries.length - 1].yearly;
+  }
+
+  // ── Formatting ───────────────────────────────────────────
+
+  function fmtKr(amount) {
+    if (amount === null || amount === undefined) return '–';
+    return Math.round(amount).toLocaleString('nb-NO') + ' kr';
+  }
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── Render ───────────────────────────────────────────────
+
+  function renderStats(person) {
+    const data = loadData();
+    const entries = data[person];
+    const el = document.getElementById('stats-' + person);
+    const yearly = latestYearly(entries);
+
+    if (entries.length === 0) {
+      el.innerHTML = '<div class="stat wide"><div class="value no-data">Ingen lønn registrert ennå</div></div>';
+      return;
+    }
+
+    const lastEntry = entries[entries.length - 1];
+
+    el.innerHTML = `
+      <div class="stat wide">
+        <div class="label">Forventet årslønn (brutto)</div>
+        <div class="value">${fmtKr(yearly)}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Månedslønn (brutto)</div>
+        <div class="value">${fmtKr(yearly / 12)}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Antall registreringer</div>
+        <div class="value">${entries.length}</div>
+      </div>
+      <div class="stat wide">
+        <div class="label">Sist oppdatert</div>
+        <div class="value">${fmtDate(lastEntry.timestamp)}</div>
+      </div>
+    `;
+  }
+
+  function renderComparison() {
+    const data = loadData();
+    const hYearly = latestYearly(data.herman);
+    const dYearly = latestYearly(data.ditlev);
+    const grid = document.getElementById('comparison-grid');
+    const commentBox = document.getElementById('comment-box');
+
+    if (hYearly === null || dYearly === null) {
+      grid.innerHTML = '';
+      commentBox.textContent = 'Ingen data ennå — registrer lønn for begge for å se sammenligning.';
+      return;
+    }
+
+    const diff = Math.abs(hYearly - dYearly);
+    const pct = (diff / Math.min(hYearly, dYearly) * 100).toFixed(1);
+    const leader = hYearly >= dYearly ? 'Herman' : 'Ditlev';
+
+    grid.innerHTML = `
+      <div class="cmp-stat">
+        <div class="label">Leder</div>
+        <div class="value">${leader}</div>
+      </div>
+      <div class="cmp-stat">
+        <div class="label">Differanse per år</div>
+        <div class="value">${fmtKr(diff)}</div>
+      </div>
+      <div class="cmp-stat">
+        <div class="label">Differanse i prosent</div>
+        <div class="value">${pct} %</div>
+      </div>
+    `;
+
+    commentBox.textContent = getComment(leader, diff, pct);
+  }
+
+  function getComment(leader, diff, pct) {
+    const other = leader === 'Herman' ? 'Ditlev' : 'Herman';
+    const pctNum = parseFloat(pct);
+
+    if (pctNum < 1) return `Det er ekstremt jevnt! ${leader} leder med hårfin margin 🤝`;
+    if (pctNum < 5) return `Knall jevnt — ${leader} er hakket foran ${other} 🏃`;
+    if (pctNum < 15) return `${leader} leder komfortabelt over ${other} 😎`;
+    if (pctNum < 30) return `${leader} drar ifra — ${other} må ta noen ekstra vakter! 💼`;
+    return `${leader} topper lønnsligaen med solid margin! ${other} har en jobb å gjøre 👑`;
+  }
+
+  function renderAll() {
+    renderStats('herman');
+    renderStats('ditlev');
+    renderComparison();
+  }
+
+  // ── Modal ────────────────────────────────────────────────
+
+  function openModal(person) {
+    currentPerson = person;
+    const name = person === 'herman' ? 'Herman' : 'Ditlev';
+    document.getElementById('modal-title').textContent = `Registrer lønn – ${name}`;
+    document.getElementById('salary-input').value = '';
+    document.querySelector('input[name="salary-type"][value="monthly"]').checked = true;
+    document.getElementById('modal-backdrop').classList.add('open');
+    setTimeout(() => document.getElementById('salary-input').focus(), 100);
+  }
+
+  function closeModal() {
+    document.getElementById('modal-backdrop').classList.remove('open');
+    currentPerson = null;
+  }
+
+  function saveSalary() {
+    const input = document.getElementById('salary-input');
+    const amount = parseFloat(input.value);
+    if (!amount || amount <= 0) {
+      input.focus();
+      input.style.borderColor = '#e05252';
+      setTimeout(() => input.style.borderColor = '', 1200);
+      return;
+    }
+
+    const type = document.querySelector('input[name="salary-type"]:checked').value;
+    const yearly = toYearly(amount, type);
+
+    const data = loadData();
+    data[currentPerson].push({
+      amount,
+      type,
+      yearly,
+      timestamp: new Date().toISOString()
+    });
+    saveData(data);
+
+    closeModal();
+    renderAll();
+  }
+
+  // Close on backdrop click
+  document.getElementById('modal-backdrop').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // Enter key submits
+  document.getElementById('salary-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') saveSalary();
+  });
+
+  // ── Init ─────────────────────────────────────────────────
+  renderAll();
+</script>
+
+</body>
+</html>
