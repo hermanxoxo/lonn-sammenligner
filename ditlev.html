@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ditlev – Lønnsammenligner</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .profile-hero {
+      position: relative;
+      height: 230px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .profile-hero img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+    }
+    .profile-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(26,26,46,0.82) 0%, transparent 55%);
+      display: flex;
+      align-items: flex-end;
+      padding: 20px 26px;
+    }
+    .profile-name { color: #fff; font-size: 2rem; font-weight: 800; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-brand">Lønnsammenligner</a>
+  <div class="nav-links">
+    <a href="herman.html" class="nav-link">Herman</a>
+    <a href="ditlev.html" class="nav-link active">Ditlev</a>
+  </div>
+</nav>
+
+<main>
+  <div class="profile-hero">
+    <img src="Ditlev.webp" alt="Ditlev">
+    <div class="profile-overlay">
+      <div class="profile-name">Ditlev</div>
+    </div>
+  </div>
+
+  <!-- Salary -->
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-inner">
+      <div class="section-header">
+        <div class="section-title">Lønn</div>
+        <button class="btn btn-primary btn-sm" onclick="openSalaryModal()">Oppdater lønn</button>
+      </div>
+      <div class="stat-grid" id="salary-stats"></div>
+    </div>
+  </div>
+
+  <!-- Portfolio -->
+  <div class="card">
+    <div class="card-inner">
+      <div class="section-header">
+        <div class="section-title">Aksjer &amp; fond</div>
+        <button class="btn btn-primary btn-sm" onclick="openStockModal()">+ Legg til</button>
+      </div>
+      <div id="portfolio-list"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Salary Modal -->
+<div class="modal-backdrop" id="salary-modal">
+  <div class="modal">
+    <h3>Oppdater lønn</h3>
+    <p class="subtitle">Ditlev – legg inn brutto lønn</p>
+    <label class="field-label" for="salary-amount">Beløp (kr)</label>
+    <input class="field-input" type="number" id="salary-amount" min="0" step="1" placeholder="f.eks. 65 000">
+    <label class="field-label">Lønnstype</label>
+    <div class="radio-row">
+      <label><input type="radio" name="salary-type" value="hourly"><span class="radio-chip">Timelønn</span></label>
+      <label><input type="radio" name="salary-type" value="monthly" checked><span class="radio-chip">Månedslønn</span></label>
+      <label><input type="radio" name="salary-type" value="yearly"><span class="radio-chip">Årslønn</span></label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeSalaryModal()">Avbryt</button>
+      <button class="btn btn-primary" onclick="saveSalary()">Lagre</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stock Modal -->
+<div class="modal-backdrop" id="stock-modal">
+  <div class="modal">
+    <h3>Legg til aksje eller fond</h3>
+    <p class="subtitle">Søk opp ticker-symbol fra Yahoo Finance</p>
+    <label class="field-label" for="stock-ticker">Ticker-symbol</label>
+    <input class="field-input" type="text" id="stock-ticker" placeholder="f.eks. EQNR.OL eller AAPL" autocomplete="off" spellcheck="false">
+    <div class="field-hint">Oslo Børs-aksjer: legg til .OL (f.eks. DNB.OL, MOWI.OL)</div>
+    <div class="error-msg" id="stock-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeStockModal()">Avbryt</button>
+      <button class="btn btn-primary" id="stock-btn" onclick="addStock()">Legg til</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const PERSON = 'ditlev';
+  const HOURLY_HOURS = 1950;
+
+  function loadData() {
+    const raw = localStorage.getItem('lonn-sammenligner');
+    const def = { herman: { salaryEntries: [], portfolio: [] }, ditlev: { salaryEntries: [], portfolio: [] } };
+    if (!raw) return def;
+    const d = JSON.parse(raw);
+    if (Array.isArray(d.herman)) {
+      return { herman: { salaryEntries: d.herman, portfolio: [] }, ditlev: { salaryEntries: Array.isArray(d.ditlev) ? d.ditlev : [], portfolio: [] } };
+    }
+    ['herman', 'ditlev'].forEach(p => {
+      d[p] = d[p] || {};
+      d[p].salaryEntries = d[p].salaryEntries || [];
+      d[p].portfolio = d[p].portfolio || [];
+    });
+    return d;
+  }
+
+  function saveData(d) { localStorage.setItem('lonn-sammenligner', JSON.stringify(d)); }
+
+  function toYearly(amount, type) {
+    if (type === 'hourly')  return amount * HOURLY_HOURS;
+    if (type === 'monthly') return amount * 12;
+    return amount;
+  }
+
+  function fmtKr(v) {
+    if (v == null) return '–';
+    return Math.round(v).toLocaleString('nb-NO') + ' kr';
+  }
+
+  function fmtDate(iso) {
+    return new Date(iso).toLocaleDateString('nb-NO', {
+      day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderSalary() {
+    const entries = loadData()[PERSON].salaryEntries;
+    const el = document.getElementById('salary-stats');
+
+    if (!entries.length) {
+      el.innerHTML = '<div class="stat-block full" style="color:#b0b4c8;font-style:italic;font-size:.9rem">Ingen lønn registrert ennå</div>';
+      return;
+    }
+
+    const last = entries[entries.length - 1];
+    el.innerHTML = `
+      <div class="stat-block full"><div class="lbl">Årslønn (brutto)</div><div class="val">${fmtKr(last.yearly)}</div></div>
+      <div class="stat-block"><div class="lbl">Månedslønn (brutto)</div><div class="val">${fmtKr(last.yearly / 12)}</div></div>
+      <div class="stat-block"><div class="lbl">Antall registreringer</div><div class="val">${entries.length}</div></div>
+      <div class="stat-block full"><div class="lbl">Sist oppdatert</div><div class="val">${fmtDate(last.timestamp)}</div></div>
+    `;
+  }
+
+  function renderPortfolio() {
+    const portfolio = loadData()[PERSON].portfolio;
+    const el = document.getElementById('portfolio-list');
+
+    if (!portfolio.length) {
+      el.innerHTML = '<div style="color:#b0b4c8;font-style:italic;font-size:.9rem">Ingen aksjer eller fond lagt til ennå</div>';
+      return;
+    }
+
+    el.innerHTML = `<div class="portfolio-list">${portfolio.map((h, i) => `
+      <div class="holding-row" id="holding-${i}">
+        <div class="holding-info">
+          <div class="holding-ticker">${escHtml(h.ticker)}</div>
+          <div class="holding-name">${escHtml(h.name || h.ticker)}</div>
+        </div>
+        <div class="holding-price" id="price-${i}">
+          <span class="price-loading">Henter kurs…</span>
+        </div>
+        <button class="btn-ghost-red" onclick="removeStock(${i})">Fjern</button>
+      </div>
+    `).join('')}</div>`;
+
+    portfolio.forEach((h, i) => fetchAndShow(h.ticker, i));
+  }
+
+  async function fetchAndShow(ticker, idx) {
+    const el = document.getElementById('price-' + idx);
+    if (!el) return;
+    try {
+      const info = await fetchStockData(ticker);
+      const pct = info.changePct;
+      const cls = pct > 0.05 ? 'chg-up' : pct < -0.05 ? 'chg-down' : 'chg-flat';
+      const sign = pct > 0 ? '+' : '';
+      el.innerHTML = `
+        <div class="price-val">${info.price.toLocaleString('nb-NO', { maximumFractionDigits: 2 })} ${info.currency}</div>
+        <div class="price-chg ${cls}">${sign}${pct.toFixed(2)} %</div>
+      `;
+    } catch {
+      el.innerHTML = '<div class="price-loading">Kurs ikke tilgjengelig</div>';
+    }
+  }
+
+  async function fetchStockData(ticker) {
+    const sym = encodeURIComponent(ticker.toUpperCase());
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${sym}`;
+
+    const parse = d => {
+      const r = d?.quoteResponse?.result?.[0];
+      if (!r) throw new Error('Ingen data');
+      return {
+        name: r.shortName || r.longName || ticker,
+        price: r.regularMarketPrice,
+        changePct: r.regularMarketChangePercent,
+        currency: r.currency || ''
+      };
+    };
+
+    try {
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (res.ok) return parse(await res.json());
+    } catch {}
+
+    const proxy = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+    const res = await fetch(proxy);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return parse(await res.json());
+  }
+
+  function openSalaryModal() {
+    document.getElementById('salary-amount').value = '';
+    document.querySelector('input[name="salary-type"][value="monthly"]').checked = true;
+    document.getElementById('salary-modal').classList.add('open');
+    setTimeout(() => document.getElementById('salary-amount').focus(), 80);
+  }
+
+  function closeSalaryModal() {
+    document.getElementById('salary-modal').classList.remove('open');
+  }
+
+  function saveSalary() {
+    const inp = document.getElementById('salary-amount');
+    const amount = parseFloat(inp.value);
+    if (!amount || amount <= 0) {
+      inp.classList.add('has-error');
+      inp.focus();
+      setTimeout(() => inp.classList.remove('has-error'), 1500);
+      return;
+    }
+    const type = document.querySelector('input[name="salary-type"]:checked').value;
+    const data = loadData();
+    data[PERSON].salaryEntries.push({ amount, type, yearly: toYearly(amount, type), timestamp: new Date().toISOString() });
+    saveData(data);
+    closeSalaryModal();
+    renderSalary();
+  }
+
+  function openStockModal() {
+    document.getElementById('stock-ticker').value = '';
+    document.getElementById('stock-error').style.display = 'none';
+    document.getElementById('stock-modal').classList.add('open');
+    setTimeout(() => document.getElementById('stock-ticker').focus(), 80);
+  }
+
+  function closeStockModal() {
+    document.getElementById('stock-modal').classList.remove('open');
+  }
+
+  async function addStock() {
+    const tickerEl = document.getElementById('stock-ticker');
+    const errEl = document.getElementById('stock-error');
+    const btn = document.getElementById('stock-btn');
+    const ticker = tickerEl.value.trim().toUpperCase();
+
+    errEl.style.display = 'none';
+
+    if (!ticker) {
+      tickerEl.classList.add('has-error');
+      setTimeout(() => tickerEl.classList.remove('has-error'), 1500);
+      return;
+    }
+
+    const data = loadData();
+    if (data[PERSON].portfolio.some(h => h.ticker === ticker)) {
+      errEl.textContent = `${ticker} er allerede i porteføljen`;
+      errEl.style.display = 'block';
+      return;
+    }
+
+    btn.textContent = 'Validerer…';
+    btn.disabled = true;
+
+    try {
+      const info = await fetchStockData(ticker);
+      data[PERSON].portfolio.push({ ticker, name: info.name, addedAt: new Date().toISOString() });
+      saveData(data);
+      closeStockModal();
+      renderPortfolio();
+    } catch {
+      errEl.textContent = `Fant ikke "${ticker}". Sjekk at symbolet er riktig (f.eks. EQNR.OL, AAPL).`;
+      errEl.style.display = 'block';
+    } finally {
+      btn.textContent = 'Legg til';
+      btn.disabled = false;
+    }
+  }
+
+  function removeStock(idx) {
+    const data = loadData();
+    data[PERSON].portfolio.splice(idx, 1);
+    saveData(data);
+    renderPortfolio();
+  }
+
+  ['salary-modal', 'stock-modal'].forEach(id => {
+    document.getElementById(id).addEventListener('click', e => {
+      if (e.target === document.getElementById(id)) document.getElementById(id).classList.remove('open');
+    });
+  });
+
+  document.getElementById('salary-amount').addEventListener('keydown', e => { if (e.key === 'Enter') saveSalary(); });
+  document.getElementById('stock-ticker').addEventListener('keydown', e => { if (e.key === 'Enter') addStock(); });
+  document.getElementById('stock-ticker').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+
+  renderSalary();
+  renderPortfolio();
+</script>
+
+</body>
+</html>
